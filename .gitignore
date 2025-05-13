@@ -2,4 +2,3 @@ java_app/.idea/**
 java_app/target/**
 *.pdf
 .env
-init.sql
