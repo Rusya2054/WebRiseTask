@@ -2,6 +2,7 @@ package com.Rusya2054.webrise.task.services;
 
 import com.Rusya2054.webrise.task.configurations.PrimaryDataBaseConfig;
 
+import com.Rusya2054.webrise.task.exceptions.SubscriptionNotFoundException;
 import com.Rusya2054.webrise.task.exceptions.UserExistsException;
 import com.Rusya2054.webrise.task.exceptions.UserNotFoundException;
 import com.Rusya2054.webrise.task.models.Subscription;
@@ -59,11 +60,44 @@ public class UserService {
             isolation = Isolation.READ_COMMITTED,
             rollbackFor = {UserNotFoundException.class}
     )
+    public Subscription updateUsersSubscription(Long userId, String subscriptionName) throws UserNotFoundException, SubscriptionNotFoundException {
+        User user = userRepository.getUserById(userId).orElseThrow(()-> new UserNotFoundException(userId));
+        Subscription subscription = subscriptionRepository.findByName(subscriptionName).orElseThrow(()-> new SubscriptionNotFoundException(subscriptionName));
+        user.getSubscriptions().add(subscription);
+        userRepository.save(user);
+        userRepository.flush();
+        log.info("Updated user with usename: [{}], id: [{}]. Added subscription: {}", user.getUsername(), user.getId(), subscription.getName());
+        return subscription;
+    }
+
+    @Transactional(transactionManager = PrimaryDataBaseConfig.TRANSACTION_MANAGER,
+            isolation = Isolation.READ_COMMITTED,
+            rollbackFor = {UserNotFoundException.class}
+    )
     public void deleteUserById(Long userId) throws UserNotFoundException{
         User user = userRepository.getUserById(userId).orElseThrow(()-> new UserNotFoundException(userId));
         Set<Subscription> userSubscriptions = subscriptionRepository.findSubscriptionsByUserId(user.getId());
-        subscriptionRepository.deleteAll(userSubscriptions);
         userRepository.delete(user);
         log.info("Deleted user with id: [{}] with {} subscriptions", user.getUsername(), userSubscriptions.size());
+    }
+
+    @Transactional(transactionManager = PrimaryDataBaseConfig.TRANSACTION_MANAGER,
+            isolation = Isolation.READ_COMMITTED,
+            rollbackFor = {UserNotFoundException.class}
+    )
+    public void deleteSubscriptionById(Long userId, Long subscriptionId) throws UserNotFoundException, SubscriptionNotFoundException {
+        User user = userRepository.getUserById(userId).orElseThrow(()-> new UserNotFoundException(userId));
+        Subscription subscription = subscriptionRepository.findById(subscriptionId).orElseThrow(()-> new SubscriptionNotFoundException(subscriptionId));
+        user.getSubscriptions().remove(subscription);
+        userRepository.save(user);
+        log.info("Deleted subscription with id: {} of user with id: [{}]", subscriptionId, userId);
+    }
+
+    public Set<Subscription> getUsersSubscriptions(Long userId) throws UserNotFoundException {
+        User user = userRepository.getUserById(userId).orElseThrow(()-> new UserNotFoundException(userId));
+        return subscriptionRepository.findSubscriptionsByUserId(user.getId());
+    }
+    public Set<Subscription> getTopSubscriptions(Long limit) {
+        return subscriptionRepository.findTopSubscriptions(limit);
     }
 }
